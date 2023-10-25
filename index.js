@@ -8,8 +8,6 @@ const defaultPollingInterval = 3;
 const infoRetDelay = 250;
 const defaultTrace = false;
 const autoDiscoverTime = 3000;
-const setAVRState = false;
-/* Setup settings button and info button */
 
 let Service;
 let Characteristic;
@@ -21,9 +19,7 @@ var debugToInfo;
 var discoverDev;
 var g_log;
 
-var foundtvs = [];
 var cachedAccessories = [];
-
 var didFinishLaunching = false;
 
 /* Variables for telnet polling system */
@@ -44,20 +40,19 @@ module.exports = (homebridge) => {
 exports.logDebug = function(string) {
 	if (!debugToInfo)
 		g_log.debug(string);
-	else 
+	else
 		g_log.warn(string);
 }
 function logDebug(string) {
 	if (!debugToInfo)
 		g_log.debug(string);
-	else 
+	else
 		g_log.warn(string);
 }
 
 class sharpClient {
 	constructor(log, config, api) {
 		g_log = log;
-		this.port = 10002;
 		this.api = api;
 
 		/* Stop loading if plugin is not configured */
@@ -81,10 +76,11 @@ class sharpClient {
 			try {
 				for (let i in config.devices) {
 					if (config.devices[i].ip !== undefined && !this.configTVs[config.devices[i].ip])
-						this.configTVs[config.devices[i].ip] = new tv(this, config, config.devices[i].ip);
+						this.configTVs[config.devices[i].ip] =
+							new tv(this, config, config.devices[i].ip);
 				}
-			} catch {
-				g_log.error("ERROR: Could not setup devices")
+			} catch (error) {
+				g_log.error(error);
 				return;
 			}
 			setTimeout(this.removeCachedAccessory.bind(this), autoDiscoverTime+5000);
@@ -96,7 +92,8 @@ class sharpClient {
 			logDebug('DEBUG: configureAccessory');
 			try {
 				logDebug(platformAccessory.displayName);
-			} catch {
+			} catch (error) {
+				g_log.error(error);
 			}
 		}
 
@@ -107,16 +104,17 @@ class sharpClient {
 		if (traceOn) {
 			logDebug('DEBUG: removeCachedAccessory');
 			try {
-				for (let i in cachedAccessories) 
+				for (let i in cachedAccessories)
 					logDebug(cachedAccessories[0].displayName);
-			} catch {
+			} catch (error) {
+				g_log.error(error);
 			}
 		}
 
 		try {
 			this.api.unregisterPlatformAccessories(pluginName, platformName, cachedAccessories);
-		} catch {
-			g_log.error("ERROR: Could not unregister accessories.");
+		} catch (error) {
+			g_log.error(error);
 		}
 	}
 }
@@ -131,26 +129,18 @@ class tv {
 		this.last_command=null;
 
 		this.tvAccessories = [];
-		this.legacyAccessories = [];
-		this.volumeAccessories = [];
 
-		this.switches = config.switches;
 		this.devices = config.devices;
-		this.volumeControl = config.volumeControl;
 
 		this.devicesDuplicates = [];
-		this.switchesDuplicates = [];
-		this.volumeCtrlDuplicates = [];
 
-		g_log.info('Start tv with ip: ' + this.ip);
+		g_log.info('Start TV with IP: ' + this.ip);
 
 		this.pollingInterval = config.pollInterval || defaultPollingInterval;
 		this.pollingInterval = this.pollingInterval * 1000;
 
-		this.htmlControl = false;
 		this.telnetPort = 10002;
 		this.devInfoSet = false;
-		this.controlProtocolSet = false;
 		this.telnet = null;
 
 		this.manufacturer = 'Sharp';
@@ -160,13 +150,6 @@ class tv {
 
 		this.disabletv = false;
 		this.pollingTimeout = false;
-		this.usesManualPort = false;
-
-		this.webAPIPort = null;
-		this.checkAliveInterval = null;
-
-		this.zTwoEn = false;
-		this.zThreeEn = false;
 
 		this.poweredOn = [false,false,false];
 		this.currentInputID = [null,null,null];
@@ -174,9 +157,11 @@ class tv {
 		this.volumeLevel = [30,30,30];
 		this.muteState = [false,false,false];
 
-		this.getPortSettings();
 		this.startConfiguration();
-	}
+		//start polling
+		setInterval(this.pollForUpdates.bind(this, 1), this.pollingInterval)
+		this.pollForUpdates(1); //initial poll to get state on startup
+}
 
 	getDevInfoSet() {
 		return this.devInfoSet;
@@ -187,30 +172,11 @@ class tv {
 	returnIP() {
 		return this.ip;
 	}
-	returnPort() {
-		return this.webAPIPort;
-	}
-	hasManualPort() {
-		return this.usesManualPort;
-	}
-	setDisabletv(set) {
-		g_log.error('ERROR: tv with IP: ' + this.ip + " is disabled. Can't connect through http or Telnet.")
-		this.disabletv = set;
-	}
-
-	getPortSettings() {
-
-			this.htmlControl = false;
-			logDebug('DEBUG: Manual control through Telnet set: ' + this.ip);
-			this.controlProtocolSet = true;
-	}
 
 	/* 
 	 * Try configure the devices. Wait until tv discovery is finished.
 	 */
 	startConfiguration () {
-		if (this.disabletv)
-			return;
 
 		if ( !didFinishLaunching) {
 			setTimeout(this.startConfiguration.bind(this), infoRetDelay);
@@ -228,23 +194,12 @@ class tv {
 						this.devicesDuplicates[this.devices[i].name] = true;
 						this.tvAccessories.push(new tvClient(this, this.devices[i]));
 					}
-				} catch {
-					g_log.error("ERROR: Could not add TV accessory.");
+				} catch (error) {
+					g_log.error(error);
 				}
 			}
 		}
 
-		/* start the polling */
-		setTimeout(this.startPolling, Math.random() * 3000, this);
-	}
-
-	/*
-	 * Diverted start of polling loop.
-	 */
-	startPolling (that) {
-		if (!that.checkAliveInterval) {
-			that.checkAliveInterval = setInterval(that.pollForUpdates.bind(that, 1), that.pollingInterval);
-		}
 	}
 
 	/*
@@ -252,9 +207,6 @@ class tv {
 	 * the on characteristic periodically.
 	 */
 	pollForUpdates(zone) {
-		if (!this.controlProtocolSet)
-			return;
-
 		// if (traceOn)
 		// 	logDebug('DEBUG: pollForUpdates zone: ' + zone + ': ' + this.ip);
 
@@ -302,16 +254,16 @@ class tv {
 		this.telnet = new Telnet();
 		const params = {
 		  host: this.ip,
-		  port: 10002,
+		  port: this.port,
 		  negotiationMandatory: false,
 		  timeout: 1500,
 		  ors: '\r',
 		  irs: '\r',
 		  shellPrompt: null
 		}
-		this.telnet.connect(params).then( 
-			res => { logDebug('Connected to '+this.ip) }).catch( 
-			error => { logDebug(error) } 
+		this.telnet.connect(params).then(
+			res => { logDebug('Connected to '+this.ip) }).catch(
+			error => { logDebug(error) }
 		);
       }
 
@@ -320,10 +272,10 @@ class tv {
 		this.connect();
 	        this.telnet.send(cmd).then(
 			res => { this.responseHandler(cmd,res.slice(0, -1)) }).catch(
-			error => { 
+			error => {
 				logDebug(error);
 				this.telnet=null;
-			} 
+			}
 		);
       }
 
@@ -354,34 +306,23 @@ class tv {
 }
 
 class tvClient {
-	constructor(recv, device) {
-		this.port = 3000;
-		this.api = recv.api;
-		this.recv = recv;
+	constructor(tv, device) {
+		this.api = tv.api;
+		this.tv = tv;
 
-		this.tvServicePort = recv.webAPIPort;
-
-		this.manufacturer = recv.manufacturer;
-		this.modelName = recv.modelName;
-		this.serialNumber = recv.serialNumber;
-		this.firmwareRevision = recv.firmwareRevision;
+		this.manufacturer = tv.manufacturer;
+		this.modelName = tv.modelName;
+		this.serialNumber = tv.serialNumber;
+		this.firmwareRevision = tv.firmwareRevision;
 
 		// configuration
-		this.name = device.name || 'Denon tv';
+		this.name = device.name || 'Sharp TV';
 		this.ip = device.ip;
 		this.inputs = device.inputs;
 		this.zone = device.zone || 1;
-		if (this.zone < 1 || this.zone > 3)
-			this.zone = 1;
-
-		if (this.zone == 2)
-			this.recv.zTwoEn = true;
-		if (this.zone == 3)
-			this.recv.zThreeEn = true;
+		this.zone = 1;
 
 		this.iterator = this.zone - 1;
-		this.defaultVolume = {};
-
 		this.defaultInputID = device.defaultInputID;
 
 		/* setup variables */
@@ -399,8 +340,7 @@ class tvClient {
 	 * Start of TV integration service 
 	 ****************************************/
 	setupTvService() {
-		if (traceOn)
-			logDebug('DEBUG: setupTvService zone: ' + this.zone + ': ' + this.name);
+		logDebug('setupTvService: ' + this.name);
 
 		this.tvAccesory = new Accessory(this.name, UUIDGen.generate(this.ip+this.name+"tvService"));
 		this.tvAccesory.category = this.api.hap.Categories.TELEVISION;
@@ -420,29 +360,27 @@ class tvClient {
 				this.setAppSwitchState(true, callback, this.inputIDs[inputIdentifier]);
 			})
 			.on('get', this.getAppSwitchState.bind(this));
-		this.tvService
-			.getCharacteristic(Characteristic.RemoteKey)
-			.on('set', this.remoteKeyPress.bind(this));
 		this.tvAccesory
 			.getService(Service.AccessoryInformation)
 			.setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
 			.setCharacteristic(Characteristic.Model, this.modelName)
 			.setCharacteristic(Characteristic.SerialNumber, this.serialNumber)
 			.setCharacteristic(Characteristic.FirmwareRevision, this.firmwareRevision);
+		this.tvService
+			.getCharacteristic(Characteristic.RemoteKey)
+			.on('set', this.remoteKeyPress.bind(this));
 
 		this.tvAccesory.addService(this.tvService);
 
 		this.setupInputSourcesService();
 
-
-		logDebug('DEBUG: publishExternalAccessories: '+ this.name);
+		logDebug('PublishExternalAccessories: '+ this.name);
 		this.api.publishExternalAccessories(pluginName, [this.tvAccesory]);
 	}
 
 
 	setupInputSourcesService() {
-		if (traceOn)
-			logDebug('DEBUG: setupInputSourcesService: ' + this.name);
+		logDebug('setupInputSourcesService: ' + this.name);
 		if (this.inputs === undefined || this.inputs === null || this.inputs.length <= 0) {
 			return;
 		}
@@ -473,11 +411,6 @@ class tvClient {
 				inputName = value.name;
 			}
 
-			this.defaultVolume[inputID] = 0
-			if (value.defaultVolume !== undefined) {
-				this.defaultVolume[inputID] = value.defaultVolume;
-			}
-
 			// if inputID not null or empty add the input
 			if (inputID !== undefined && inputID !== null && inputID !== '') {
 				inputID = inputID.replace(/\s/g, ''); // remove all white spaces from the string
@@ -488,7 +421,8 @@ class tvClient {
 					.setCharacteristic(Characteristic.ConfiguredName, inputName)
 					.setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
 					.setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION)
-					.setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
+					.setCharacteristic(Characteristic.CurrentVisibilityState,
+										Characteristic.CurrentVisibilityState.SHOWN);
 
 				tempInput
 					.getCharacteristic(Characteristic.ConfiguredName)
@@ -506,7 +440,7 @@ class tvClient {
 		});
 	}
 	/*****************************************
-	* End of TV integration service 
+	* End of TV integration service
 	****************************************/
 
 
@@ -515,19 +449,11 @@ class tvClient {
 	 ****************************************/
 	updatetvState(tvStatus) {
 		if (!tvStatus) {
-			if (this.powerService) 
-				this.powerService
-					.getCharacteristic(Characteristic.On)
-					.updateValue(false);
-			if (this.tvService) 
+			if (this.tvService)
 				this.tvService
 					.getCharacteristic(Characteristic.Active)
 					.updateValue(false); //tv service
 		} else {
-			if (this.powerService) 
-				this.powerService
-					.getCharacteristic(Characteristic.On)
-					.updateValue(true);
 			if (this.tvService)
 				this.tvService
 					.getCharacteristic(Characteristic.Active)
@@ -539,13 +465,11 @@ class tvClient {
 		if (this.zone != stateInfo.zone)
 			return;
 
-		if (traceOn && setAVRState)
-			logDebug('DEBUG: settvState zone: ' + this.name);
 		if (stateInfo.power === true || stateInfo.power === false)
-			this.updatetvState(this.recv.poweredOn[this.iterator]);
+			this.updatetvState(this.tv.poweredOn[this.iterator]);
 
 		if (stateInfo.inputID) {
-			if (this.recv.poweredOn[this.iterator]) {
+			if (this.tv.poweredOn[this.iterator]) {
 				let inputName = stateInfo.inputID;
 				for (let i = 0; i < this.inputIDs.length; i++) {
 					if (inputName === this.inputIDs[i]) {
@@ -569,14 +493,14 @@ class tvClient {
 	 ****************************************/
 	getPowerState(callback) {
 		if (traceOn)
-			logDebug('DEBUG: getPowerState zone: ' + this.zone + ': ' + this.name);
+			logDebug('DEBUG: getPowerState: '+ this.name);
 
-		callback(null, this.recv.poweredOn[this.iterator] ? 1 : 0);
+		callback(null, this.tv.poweredOn[this.iterator] ? 1 : 0);
 	}
 
 	setPowerState(state, callback) {
 		if (traceOn)
-			logDebug('DEBUG: setPowerState zone: ' + this.zone + 'state: ' + this.name);
+			logDebug('DEBUG: setPowerState' + state + ': ' + this.name);
 
 		if (state === 0)
 			state = false;
@@ -585,7 +509,7 @@ class tvClient {
 			var stateString;
 			if (this.zone == 1)
 				stateString = 'POWR' + (state ? '1   ' : '0   ');
-			this.recv.send(stateString); 
+			this.tv.send(stateString);
 			/* Update possible other switches and accessories too */
 			let stateInfo = {
 				zone: this.zone,
@@ -594,7 +518,7 @@ class tvClient {
 				masterVol: null,
 				mute: null
 			}
-			this.recv.updateStates(this.recv, stateInfo, this.name);
+			this.tv.updateStates(this.tv, stateInfo, this.name);
 
 			callback();
 	}
@@ -602,10 +526,10 @@ class tvClient {
 
 	getAppSwitchState(callback) {
 		if (traceOn)
-			logDebug('DEBUG: getAppSwitchState zone: ' + this.zone);
+			logDebug('DEBUG: getAppSwitchState: ' + this.name);
 
-		if (this.recv.poweredOn[this.iterator]) {
-			let inputName = this.recv.currentInputID[this.iterator];
+		if (this.tv.poweredOn[this.iterator]) {
+			let inputName = this.tv.currentInputID[this.iterator];
 			for (let i = 0; i < this.inputIDs.length; i++) {
 				if (inputName === this.inputIDs[i]) {
 					this.tvService
@@ -621,7 +545,7 @@ class tvClient {
 
 	setAppSwitchState(state, callback, inputName) {
 		if (traceOn)
-			logDebug('DEBUG: setAppSwitchState zone: ' + this.zone + ': ' + this.name);
+			logDebug('DEBUG: setAppSwitchState zone: ' + this.name);
 
 		this.inputIDSet = true;
 
@@ -637,33 +561,57 @@ class tvClient {
 
 
 
-		that.recv.send(inputString);
+		that.tv.send(inputString);
 
 		/* Update possible other switches and accessories too */
 		let stateInfo = {
 			zone: that.zone,
-			power: that.recv.poweredOn[that.iterator],
+			power: that.tv.poweredOn[that.iterator],
 			inputID: inputName
 		}
-		that.recv.updateStates(that.recv, stateInfo, that.name);
+		that.tv.updateStates(that.tv, stateInfo, that.name);
 
 		callback();
 	}
 
 	remoteKeyPress(remoteKey, callback) {
 		var ctrlString = '';
-
 		switch (remoteKey) {
 			case Characteristic.RemoteKey.INFORMATION:
-				ctrlString = ''
+				ctrlString = 'RCKY13';
+				break;
+			case Characteristic.RemoteKey.ARROW_UP:
+				ctrlString = 'RCKY41';
+				break;
+			case Characteristic.RemoteKey.ARROW_DOWN:
+				ctrlString = 'RCKY42';
+				break;
+			case Characteristic.RemoteKey.ARROW_LEFT:
+				ctrlString = 'RCKY43';
+				break;
+			case Characteristic.RemoteKey.ARROW_RIGHT:
+				ctrlString = 'RCKY44';
+				break;
+			case Characteristic.RemoteKey.SELECT:
+				ctrlString = 'RCKY40';
+				break;
+			case Characteristic.RemoteKey.BACK:
+				ctrlString = 'RCKY45';
+				break;
+			case Characteristic.RemoteKey.EXIT:
+				ctrlString = 'RCKY46';
+				break;
+			case Characteristic.RemoteKey.PLAY_PAUSE:
+				ctrlString = 'RCKY38';
 				break;
 		}
 
-		if (ctrlString != '' && this.recv.poweredOn[this.iterator]) {
-				this.recv.send(ctrlString);
+		if (ctrlString != '' && this.tv.poweredOn[this.iterator]) {
+				this.tv.send(ctrlString+'  ');
 		}
 		callback();
 	}
+
 
 	getName() {
 		return this.name;
