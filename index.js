@@ -142,7 +142,7 @@ class tv {
 		this.switchesDuplicates = [];
 		this.volumeCtrlDuplicates = [];
 
-		logDebug('DEBUG: Start tv with ip: ' + this.ip);
+		g_log.info('Start tv with ip: ' + this.ip);
 
 		this.pollingInterval = config.pollInterval || defaultPollingInterval;
 		this.pollingInterval = this.pollingInterval * 1000;
@@ -151,7 +151,7 @@ class tv {
 		this.telnetPort = 10002;
 		this.devInfoSet = false;
 		this.controlProtocolSet = false;
-		this.socket;
+		this.telnet = null;
 
 		this.manufacturer = 'Sharp';
 		this.modelName = pluginName;
@@ -217,7 +217,6 @@ class tv {
 			return;
 		}
 
-		this.connect();
 		/* Configure devices */
 		for (let i in this.devices) {
 			if (this.devices[i].ip === this.ip) {
@@ -311,15 +310,20 @@ class tv {
 		  shellPrompt: null
 		}
 		this.telnet.connect(params).then( 
-			res => { g_log.info('Connected to '+this.ip) }).catch( 
-			error => { g_log.warn(error) } 
+			res => { logDebug('Connected to '+this.ip) }).catch( 
+			error => { logDebug(error) } 
 		);
       }
 
       send(cmd) {
+		if (this.telnet == null)
+		this.connect();
 	        this.telnet.send(cmd).then(
 			res => { this.responseHandler(cmd,res.slice(0, -1)) }).catch(
-			error => { logDebug(error)} 
+			error => { 
+				logDebug(error);
+				this.telnet=null;
+			} 
 		);
       }
 
@@ -342,6 +346,8 @@ class tv {
 			logDebug(stateInfo);
 			if (!this.pollingTimeout)
 				this.updateStates(this, stateInfo, null);
+			this.telnet.end().then( () => { this.telnet = null; } )
+
 		break;
         }
     }
