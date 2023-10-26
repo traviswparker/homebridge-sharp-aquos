@@ -88,14 +88,6 @@
 										"placeholder": "HDMI 1",
 										"required": true,
 										"minLength": 1
-									},
-									"defaultVolume": {
-										"title": "Default volume",
-										"description": "This volume will be set when turning on this switch. You can define a different default volume for input. 0 is disabled.",
-										"placeholder": 0,
-										"type": "integer",
-										"required": false,
-										"maximum": 100
 									}
 								}
 							}
