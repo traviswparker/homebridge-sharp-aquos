@@ -1,6 +1,6 @@
 {
   "name": "homebridge-sharp-aquos-plugin",
-  "version": "2.9.7",
+  "version": "3.0.0",
   "description": "Sharp Aquos TV control",
   "main": "index.js",
   "scripts": {
