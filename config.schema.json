@@ -20,7 +20,7 @@
 				"required": false
 			},
 			"devices": {
-				"description": "Information on configuring Devices can be found on https://github.com/Martvvliet/homebridge-denon-heos",
+				"description": "Name and IP of TVs to create accessories for",
 				"title": "Devices",
 				"type": "array",
 				"items": {
@@ -29,7 +29,7 @@
 						"name": {
 							"title": "Name",
 							"type": "string",
-							"default": "Denon Receiver",
+							"default": "Sharp TV",
 							"required": true,
 							"minLength": 4
 						},
