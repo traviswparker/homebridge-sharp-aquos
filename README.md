@@ -1,4 +1,4 @@
-# homebridge-sharp-tv
+# homebridge-sharp-aquos
 Homebridge plugin for Sharp Aquos TVs.  
 Exposes TV accessories with power and input controls.  
 TV will be unbridged, so you will have to add it manually in Home via + > Add Accessory > More options...

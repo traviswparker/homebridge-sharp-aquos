@@ -1,6 +1,6 @@
 const { Telnet } = require('telnet-client');
 
-const pluginName = 'homebridge-sharp-tv';
+const pluginName = 'homebridge-sharp-aquos-plugin';
 const platformName = 'SharpTV';
 const pluginVersion = '2.9.0';
 

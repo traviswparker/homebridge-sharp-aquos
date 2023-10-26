@@ -1,5 +1,5 @@
 {
-  "name": "homebridge-sharp-tv",
+  "name": "homebridge-sharp-aquos-plugin",
   "version": "2.9.7",
   "description": "Sharp Aquos TV control",
   "main": "index.js",
@@ -14,16 +14,17 @@
     "homebridge",
     "homebridge-plugin",
     "HomeKit",
-    "homebridge-sharp-tv",
+    "homebridge-sharp-aquos",
     "Sharp",
-    "Aquos"
+    "Aquos",
+    "TV"
   ],
   "author": "Travis Parker, Nicolas Neubauer, Mart van Vliet",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/traviswparker/homebridge-sharp-tv/issues"
+    "url": "https://github.com/traviswparker/homebridge-sharp-aquos/issues"
   },
-  "homepage": "https://github.com/traviswparker/homebridge-sharp-tv#readme",
+  "homepage": "https://github.com/traviswparker/homebridge-sharp-aquos#readme",
   "engines": {
     "node": ">=9.11.2",
     "homebridge": ">=0.4.53",
