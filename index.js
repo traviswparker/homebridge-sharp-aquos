@@ -1,8 +1,8 @@
 const { Telnet } = require('telnet-client');
 
-const pluginName = 'homebridge-sharp-aquos-plugin';
+const pluginName = 'homebridge-sharp-aquos-tv';
 const platformName = 'SharpTV';
-const pluginVersion = '2.9.0';
+const pluginVersion = '3.0.0';
 
 const defaultPollingInterval = 3;
 const infoRetDelay = 250;

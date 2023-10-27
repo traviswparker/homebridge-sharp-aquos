@@ -1,5 +1,5 @@
 {
-  "name": "homebridge-sharp-aquos-plugin",
+  "name": "homebridge-sharp-aquos-tv",
   "version": "3.0.0",
   "description": "Sharp Aquos TV control",
   "main": "index.js",
