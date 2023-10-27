@@ -372,12 +372,30 @@ class tvClient {
 
 		this.tvAccesory.addService(this.tvService);
 
+		this.setupTvSpeakerService();
 		this.setupInputSourcesService();
 
 		logDebug('PublishExternalAccessories: '+ this.name);
 		this.api.publishExternalAccessories(pluginName, [this.tvAccesory]);
 	}
 
+	setupTvSpeakerService() {
+		logDebug('setupTvSpeakerService: ' + this.name);
+		this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
+		this.tvSpeakerService
+			.setCharacteristic(Characteristic.Active,
+					Characteristic.Active.ACTIVE)
+			.setCharacteristic(Characteristic.VolumeControlType,
+					Characteristic.VolumeControlType.RELATIVE);
+		this.tvSpeakerService
+			.getCharacteristic(Characteristic.VolumeSelector)
+			.on('set', this.setVolume.bind(this));
+		this.tvSpeakerService
+			.getCharacteristic(Characteristic.Mute)
+			.on('set', this.setMute.bind(this));
+		this.tvAccesory.addService(this.tvSpeakerService);
+		this.tvService.addLinkedService(this.tvSpeakerService);
+	}
 
 	setupInputSourcesService() {
 		logDebug('setupInputSourcesService: ' + this.name);
@@ -571,6 +589,26 @@ class tvClient {
 		}
 		that.tv.updateStates(that.tv, stateInfo, that.name);
 
+		callback();
+	}
+
+	setVolume(state, callback) {
+		logDebug('DEBUG: setVolume ' + state + ': ' + this.name);
+
+		var that = this;
+		if (this.tv.poweredOn[this.iterator]) {
+			var stateString = state ? 'RCKY32  ' : 'RCKY33  '; //  UP : DOWN
+			that.tv.send(stateString);
+		}
+		callback();
+	}
+
+	setMute(callback) {
+		logDebug('DEBUG: setMute: ' + this.name);
+
+		var that = this;
+		if (this.tv.poweredOn[this.iterator])
+			that.tv.send('RCKY31  ');
 		callback();
 	}
 
